@@ -65,8 +65,17 @@ class VoyageEmbedder(Embedder):
         return r.embeddings[0]
 
 
-@lru_cache(maxsize=1)
-def get_embedder() -> Embedder:
-    if config.EMBED_BACKEND == "voyage":
-        return VoyageEmbedder(config.VOYAGE_EMBED_MODEL)
-    return LocalE5Embedder(config.LOCAL_EMBED_MODEL)
+def resolved_model(backend: str | None = None) -> str:
+    backend = (backend or config.EMBED_BACKEND).lower()
+    return config.VOYAGE_EMBED_MODEL if backend == "voyage" else config.LOCAL_EMBED_MODEL
+
+
+@lru_cache(maxsize=4)
+def get_embedder(backend: str | None = None, model: str | None = None) -> Embedder:
+    """Cached embedder. Pass backend/model explicitly to match a prebuilt index
+    (see rag.retrieve, which reads them from the collection metadata); omit to
+    use the configured defaults (used when building the index)."""
+    backend = (backend or config.EMBED_BACKEND).lower()
+    if backend == "voyage":
+        return VoyageEmbedder(model or config.VOYAGE_EMBED_MODEL)
+    return LocalE5Embedder(model or config.LOCAL_EMBED_MODEL)

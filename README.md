@@ -53,13 +53,27 @@ the SDK instead, set `TLI_LLM_BACKEND=sdk` and `ANTHROPIC_API_KEY` in `.env`.
 ```bash
 tli ingest                       # parse posts -> data/books.jsonl (normalizes years)
 tli build-history                # generate + cache historical timelines (uses Claude)
-tli index                        # embed books + events into the vector store
+tli build-profiles               # per-book setting/themes/plot profiles (uses Claude)
+tli index                        # embed books + profiles + events into the vector store
 tli info                         # sanity-check corpus / store stats
 
 tli ask "ادبیات روسیه دهه ۱۸۸۰ تحت تأثیر چه رویدادهای تاریخی بود؟"
 tli ask "Which novels were written during WWI, and how does the war show up in them?" --from 1914 --to 1918
 tli ask "What was happening in Colombia around One Hundred Years of Solitude?" --country کلمبیا
 ```
+
+## Web UI
+
+```bash
+pip install -e '.[web]'          # adds Streamlit
+tli web                          # launches the app at http://localhost:8501
+```
+
+Sidebar filters (country / year range / k) feed the same retrieval + synthesis
+pipeline; the answer pane shows Claude's grounded response, and an expander shows
+exactly which books, profiles, and events were retrieved (with similarity scores).
+The query embedder is read from the index metadata, so it always matches what
+`tli index` built — no env coupling.
 
 `--from/--to` (year range) and `--country` apply a metadata pre-filter before vector
 search — essential for temporal queries. `-k` sets how many chunks are retrieved;
@@ -76,7 +90,9 @@ src/tli/
   embeddings.py  pluggable local / Voyage embedder
   store.py       Chroma collection (cosine, self-supplied vectors)
   index.py       Phase 3: chunk + embed books + events
-  rag.py         Phase 4: filtered retrieval + Claude synthesis
+  profiles.py    Phase 2b: per-book setting/themes/plot profiles, cached
+  rag.py         Phase 4: balanced retrieval (book/profile/event) + synthesis
+  app.py         Streamlit web UI (`tli web`)
   cli.py         `tli` entry point
 ```
 

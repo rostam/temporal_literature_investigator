@@ -56,7 +56,9 @@ def retrieve(question: str, k: int = 9, *, year_min=None, year_max=None,
     are built) simply contribute nothing.
     """
     coll = get_collection()
-    qvec = get_embedder().embed_query(question)
+    md = coll.metadata or {}
+    embedder = get_embedder(md.get("embed_backend"), md.get("embed_model"))
+    qvec = embedder.embed_query(question)
     base = _filter_clauses(year_min, year_max, country)
 
     def query_type(chunk_type: str, n: int) -> list[dict]:
@@ -100,15 +102,29 @@ def _format_context(hits: list[dict]) -> str:
     return "\n\n".join(parts) if parts else "(no context retrieved)"
 
 
-def ask(question: str, *, k: int = 8, year_min=None, year_max=None,
+def _build_user(question: str, hits: list[dict]) -> str:
+    return f"Context:\n{_format_context(hits)}\n\n---\nQuestion: {question}"
+
+
+def answer(question: str, *, k: int = 9, year_min=None, year_max=None,
+           country=None) -> tuple[str, list[dict]]:
+    """Non-streaming: returns (answer_text, retrieved_hits). Used by the web UI."""
+    from .llm import get_llm
+
+    hits = retrieve(question, k=k, year_min=year_min, year_max=year_max,
+                    country=country)
+    text = get_llm().complete(_SYSTEM, _build_user(question, hits),
+                              model=config.SYNTH_MODEL, max_tokens=2000)
+    return text, hits
+
+
+def ask(question: str, *, k: int = 9, year_min=None, year_max=None,
         country=None, stream: bool = True) -> str:
     from .llm import get_llm
 
     hits = retrieve(question, k=k, year_min=year_min, year_max=year_max,
                     country=country)
-    context = _format_context(hits)
-    user = f"Context:\n{context}\n\n---\nQuestion: {question}"
-
     llm = get_llm()
     fn = llm.stream if stream else llm.complete
-    return fn(_SYSTEM, user, model=config.SYNTH_MODEL, max_tokens=2000)
+    return fn(_SYSTEM, _build_user(question, hits),
+              model=config.SYNTH_MODEL, max_tokens=2000)

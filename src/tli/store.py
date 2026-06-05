@@ -20,13 +20,13 @@ def get_collection():
     )
 
 
-def reset_collection():
+def reset_collection(extra_metadata: dict | None = None):
     client = chromadb.PersistentClient(path=str(config.CHROMA_DIR))
     try:
         client.delete_collection(config.COLLECTION)
     except Exception:  # noqa: BLE001 — fine if it didn't exist
         pass
-    return client.get_or_create_collection(
-        name=config.COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
+    metadata = {"hnsw:space": "cosine"}
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    return client.get_or_create_collection(name=config.COLLECTION, metadata=metadata)

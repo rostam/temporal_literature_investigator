@@ -10,7 +10,7 @@ Chroma metadata values must be scalars, so None is dropped.
 from __future__ import annotations
 
 from . import config
-from .embeddings import get_embedder
+from .embeddings import get_embedder, resolved_model
 from .history import load_events
 from .ingest import load_books
 from .profiles import load_profiles, setting_midpoint
@@ -113,7 +113,9 @@ def _add_in_batches(coll, embedder, ids, docs, metas, batch=64):
 def run() -> int:
     config.ensure_dirs()
     embedder = get_embedder()
-    coll = reset_collection()  # idempotent full rebuild
+    # Record the embedder in the collection so queries auto-match it (no env coupling).
+    coll = reset_collection({"embed_backend": config.EMBED_BACKEND,
+                             "embed_model": resolved_model()})
 
     books = load_books()
     bi, bd, bm = _book_docs(books)

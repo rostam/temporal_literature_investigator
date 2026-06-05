@@ -30,6 +30,7 @@ def main(argv=None) -> int:
 
     sub.add_parser("index", help="embed + load the vector store")
     sub.add_parser("info", help="show stats")
+    sub.add_parser("web", help="launch the Streamlit web UI")
 
     pa = sub.add_parser("ask", help="ask a question")
     pa.add_argument("question")
@@ -55,12 +56,33 @@ def main(argv=None) -> int:
         index.run()
     elif args.cmd == "info":
         _info()
+    elif args.cmd == "web":
+        _web()
     elif args.cmd == "ask":
         from . import rag
         rag.ask(args.question, k=args.k, year_min=args.year_min,
                 year_max=args.year_max, country=args.country,
                 stream=not args.no_stream)
     return 0
+
+
+def _web() -> None:
+    import os
+    import subprocess
+    from pathlib import Path
+
+    app_path = Path(__file__).with_name("app.py")
+    src_dir = str(Path(__file__).resolve().parents[1])  # so `import tli` works uninstalled
+    env = os.environ.copy()
+    env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
+    # Disable the source watcher: it walks torch/transformers modules and triggers
+    # noisy (harmless) torchvision import tracebacks. We don't need hot-reload here.
+    cmd = ["streamlit", "run", str(app_path),
+           "--server.fileWatcherType", "none"]
+    try:
+        subprocess.run(cmd, env=env, check=True)
+    except FileNotFoundError:
+        raise SystemExit("streamlit not installed. Run:  pip install -e '.[web]'")
 
 
 def _info() -> None:

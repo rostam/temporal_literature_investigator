@@ -46,19 +46,22 @@ def _where(clauses: list[dict]) -> dict | None:
     return clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
 
-def retrieve(question: str, k: int = 8, *, year_min=None, year_max=None,
+def retrieve(question: str, k: int = 9, *, year_min=None, year_max=None,
              country=None) -> list[dict]:
-    """Balanced retrieval: pull books AND events separately, then merge.
+    """Balanced retrieval across chunk types, then merge.
 
-    A history-phrased query otherwise lets events crowd out every book (or vice
-    versa), but the whole point is to join the two halves — so we guarantee both
-    are represented.
+    A history-phrased query otherwise lets one type crowd out the others, but the
+    whole point is to join literature (books + profiles) with history (events) —
+    so we guarantee all three are represented. Empty types (e.g. before profiles
+    are built) simply contribute nothing.
     """
     coll = get_collection()
     qvec = get_embedder().embed_query(question)
     base = _filter_clauses(year_min, year_max, country)
 
     def query_type(chunk_type: str, n: int) -> list[dict]:
+        if n <= 0:
+            return []
         res = coll.query(query_embeddings=[qvec], n_results=n,
                          where=_where(base + [{"type": chunk_type}]),
                          include=["documents", "metadatas", "distances"])
@@ -66,23 +69,32 @@ def retrieve(question: str, k: int = 8, *, year_min=None, year_max=None,
                 for d, m, dist in zip(res["documents"][0], res["metadatas"][0],
                                       res["distances"][0])]
 
-    half = max(1, k // 2)
-    return query_type("book", half) + query_type("event", k - half)
+    third = max(1, k // 3)
+    return (query_type("book", third)
+            + query_type("profile", third)
+            + query_type("event", k - 2 * third))
 
 
 def _format_context(hits: list[dict]) -> str:
-    books, events = [], []
+    books, profiles, events = [], [], []
     for h in hits:
         m = h["meta"]
-        if m.get("type") == "book":
+        t = m.get("type")
+        if t == "book":
             tag = m.get("slug", "?")
             books.append(f"[{tag}] ({m.get('country')}, {m.get('year')}) "
                          f"{m.get('title')} — {m.get('author')}\n{h['doc']}")
+        elif t == "profile":
+            tag = m.get("slug", "?")
+            profiles.append(f"[{tag}] {h['doc']}")
         else:
             events.append(f"({m.get('country')}, {m.get('year')}) {h['doc']}")
     parts = []
     if books:
         parts.append("=== BOOK REVIEWS ===\n" + "\n\n".join(books))
+    if profiles:
+        parts.append("=== BOOK PROFILES (setting / themes / plot) ===\n"
+                     + "\n\n".join(profiles))
     if events:
         parts.append("=== HISTORICAL EVENTS ===\n" + "\n".join(events))
     return "\n\n".join(parts) if parts else "(no context retrieved)"

@@ -11,4 +11,5 @@ venv/
 # Generated artifacts
 data/books.jsonl
 data/history/
+data/profiles/
 data/chroma/

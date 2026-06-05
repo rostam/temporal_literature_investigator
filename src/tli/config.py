@@ -26,6 +26,7 @@ POSTS_DIR = BOOKS_REPO / "_posts"
 DATA_DIR = REPO_ROOT / "data"
 BOOKS_JSONL = DATA_DIR / "books.jsonl"
 HISTORY_DIR = DATA_DIR / "history"
+PROFILES_DIR = DATA_DIR / "profiles"
 CHROMA_DIR = DATA_DIR / "chroma"
 COLLECTION = "tli"
 
@@ -35,6 +36,7 @@ LLM_BACKEND = os.getenv("TLI_LLM_BACKEND", "cli").lower()
 # --- Models (see the claude-api skill for current IDs) ---
 SYNTH_MODEL = os.getenv("TLI_SYNTH_MODEL", "claude-opus-4-8")     # answer synthesis
 HISTORY_MODEL = os.getenv("TLI_HISTORY_MODEL", "claude-haiku-4-5")  # bulk history gen
+PROFILE_MODEL = os.getenv("TLI_PROFILE_MODEL", HISTORY_MODEL)      # per-book profiles
 
 # --- Embeddings ---
 EMBED_BACKEND = os.getenv("TLI_EMBED_BACKEND", "local").lower()
@@ -47,4 +49,5 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 def ensure_dirs() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)

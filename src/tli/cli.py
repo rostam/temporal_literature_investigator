@@ -24,12 +24,16 @@ def main(argv=None) -> int:
     ph = sub.add_parser("build-history", help="generate historical-events layer")
     ph.add_argument("--force", action="store_true", help="regenerate cached timelines")
 
+    pp = sub.add_parser("build-profiles",
+                        help="generate per-book literary-historical profiles")
+    pp.add_argument("--force", action="store_true", help="regenerate cached profiles")
+
     sub.add_parser("index", help="embed + load the vector store")
     sub.add_parser("info", help="show stats")
 
     pa = sub.add_parser("ask", help="ask a question")
     pa.add_argument("question")
-    pa.add_argument("-k", type=int, default=8, help="chunks to retrieve")
+    pa.add_argument("-k", type=int, default=9, help="chunks to retrieve")
     pa.add_argument("--country", default=None)
     pa.add_argument("--from", dest="year_min", type=int, default=None)
     pa.add_argument("--to", dest="year_max", type=int, default=None)
@@ -43,6 +47,9 @@ def main(argv=None) -> int:
     elif args.cmd == "build-history":
         from . import history
         history.run(force=args.force)
+    elif args.cmd == "build-profiles":
+        from . import profiles
+        profiles.run(force=args.force)
     elif args.cmd == "index":
         from . import index
         index.run()
@@ -75,6 +82,8 @@ def _info() -> None:
         print("books.jsonl: (not built — run `tli ingest`)")
     n_hist = len(list(config.HISTORY_DIR.glob('*.json'))) if config.HISTORY_DIR.exists() else 0
     print(f"history    : {n_hist} (country, decade) timelines cached")
+    n_prof = len(list(config.PROFILES_DIR.glob('*.json'))) if config.PROFILES_DIR.exists() else 0
+    print(f"profiles   : {n_prof} book profiles cached")
     if config.CHROMA_DIR.exists():
         try:
             from .store import get_collection

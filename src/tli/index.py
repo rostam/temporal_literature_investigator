@@ -13,7 +13,9 @@ from . import config
 from .embeddings import get_embedder
 from .history import load_events
 from .ingest import load_books
+from .profiles import load_profiles, setting_midpoint
 from .store import reset_collection
+from .utils import decade_of
 
 _BODY_HEAD_CHARS = 1500  # keep book chunks focused; bump or split for production
 
@@ -38,6 +40,47 @@ def _book_docs(books: list[dict]):
             "country": b["country"],
             "genre": b["genre"],
             "slug": b["slug"],
+        }))
+    return ids, docs, metas
+
+
+def _profile_docs(books: list[dict], profiles: dict[str, dict]):
+    by_slug = {b["slug"]: b for b in books}
+    ids, docs, metas = [], [], []
+    for slug, p in profiles.items():
+        b = by_slug.get(slug)
+        if not b:
+            continue
+        chars = "; ".join(f"{c.get('name')}: {c.get('role')}"
+                          for c in p.get("characters", [])[:15])
+        themes = ", ".join(p.get("themes", []))
+        period = ""
+        if p.get("setting_start"):
+            period = f"{p['setting_start']}–{p.get('setting_end') or p['setting_start']}"
+        text = (
+            f"[PROFILE] {b['title_fa']} — {b['author']}\n"
+            f"Set in: {p.get('setting_place', '?')} {period}\n"
+            f"Themes: {themes}\n"
+            f"Historical backdrop: {p.get('historical_backdrop', '')}\n"
+            f"Plot: {p.get('plot_synopsis', '')}\n"
+            f"Characters: {chars}"
+        )
+        # year = story-time midpoint so temporal filters match the setting,
+        # not just the publication year (book chunk already carries publication).
+        syear = setting_midpoint(p, b["year"])
+        ids.append(f"profile::{slug}")
+        docs.append(text)
+        metas.append(_meta({
+            "type": "profile",
+            "title": b["title_fa"],
+            "author": b["author"],
+            "year": syear,
+            "decade": decade_of(syear) if syear else None,
+            "country": b["country"],            # author's country (filter-consistent)
+            "setting_place": p.get("setting_place"),
+            "themes": themes or None,
+            "confidence": p.get("confidence"),
+            "slug": slug,
         }))
     return ids, docs, metas
 
@@ -72,15 +115,22 @@ def run() -> int:
     embedder = get_embedder()
     coll = reset_collection()  # idempotent full rebuild
 
-    bi, bd, bm = _book_docs(load_books())
+    books = load_books()
+    bi, bd, bm = _book_docs(books)
+    pi, pd, pm = _profile_docs(books, load_profiles())
     ei, ed, em = _event_docs(load_events())
 
     _add_in_batches(coll, embedder, bi, bd, bm)
+    _add_in_batches(coll, embedder, pi, pd, pm)
     _add_in_batches(coll, embedder, ei, ed, em)
 
-    total = len(bi) + len(ei)
-    print(f"Indexed {len(bi)} books + {len(ei)} events = {total} chunks "
-          f"into '{config.COLLECTION}' ({config.EMBED_BACKEND} embeddings).")
+    total = len(bi) + len(pi) + len(ei)
+    print(f"Indexed {len(bi)} books + {len(pi)} profiles + {len(ei)} events "
+          f"= {total} chunks into '{config.COLLECTION}' "
+          f"({config.EMBED_BACKEND} embeddings).")
+    if not pi:
+        print("  note: no profiles indexed — run `tli build-profiles` for the "
+              "richer plot/setting/theme layer.")
     if not ei:
         print("  note: no events indexed — run `tli build-history` first for "
               "the history side of the join.")

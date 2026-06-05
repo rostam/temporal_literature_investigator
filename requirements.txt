@@ -1,0 +1,13 @@
+# Core
+anthropic>=0.69
+chromadb>=0.5
+python-frontmatter>=1.1
+PyYAML>=6.0
+python-dotenv>=1.0
+
+# Default (local) embedding backend — multilingual, runs offline, no API key.
+# Pulls in torch; comment out if you only use the Voyage backend.
+sentence-transformers>=3.0
+
+# Optional embedding backend (set TLI_EMBED_BACKEND=voyage). Needs VOYAGE_API_KEY.
+# voyageai>=0.3

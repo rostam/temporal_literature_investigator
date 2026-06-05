@@ -1,0 +1,26 @@
+[project]
+name = "temporal-literature-investigator"
+version = "0.1.0"
+description = "RAG over Persian book reviews joined to LLM-generated historical timelines."
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.69",
+    "chromadb>=0.5",
+    "python-frontmatter>=1.1",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0",
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+voyage = ["voyageai>=0.3"]
+
+[project.scripts]
+tli = "tli.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

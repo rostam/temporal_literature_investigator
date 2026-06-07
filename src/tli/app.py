@@ -2,9 +2,9 @@
 
 Launch:  tli web        (or:  streamlit run src/tli/app.py)
 
-Sidebar filters (country / year range / k) feed the same retrieval + synthesis
-pipeline as the CLI. The answer pane shows Claude's grounded response; an
-expander shows exactly which books, profiles, and events were retrieved.
+Ask a question and get a grounded answer from the same retrieval + synthesis
+pipeline as the CLI. The answer pane shows Claude's response; an expander shows
+exactly which books, profiles, and events were retrieved.
 """
 from __future__ import annotations
 
@@ -25,10 +25,7 @@ SAMPLES = [
 
 @st.cache_data(show_spinner=False)
 def _corpus_meta():
-    books = load_books()
-    countries = sorted({b["country"] for b in books if b["country"]})
-    years = [b["year"] for b in books if b["year"]]
-    return countries, (min(years), max(years)), len(books)
+    return len(load_books())
 
 
 @st.cache_data(show_spinner=False)
@@ -66,18 +63,10 @@ def main() -> None:
     st.caption("Exploring history through literature — ask how events shaped the "
                "novels of an era, or vice versa.")
 
-    countries, (ymin, ymax), n_books = _corpus_meta()
+    n_books = _corpus_meta()
     n_chunks, idx_meta = _index_meta()
 
     with st.sidebar:
-        st.header("Filters")
-        country = st.selectbox("Country", ["— any —"] + countries)
-        use_years = st.checkbox("Filter by year (story-time or publication)")
-        yr = st.slider("Year range", ymin, ymax, (ymin, ymax),
-                       disabled=not use_years)
-        k = st.slider("Chunks to retrieve (k)", 3, 18, 9)
-
-        st.divider()
         st.subheader("Status")
         st.write(f"LLM backend: `{config.LLM_BACKEND}`")
         if n_chunks is None:
@@ -105,12 +94,8 @@ def main() -> None:
         if n_chunks is None:
             st.error("No index found — build it with `tli index`.")
             return
-        kw = dict(k=k,
-                  country=None if country == "— any —" else country,
-                  year_min=yr[0] if use_years else None,
-                  year_max=yr[1] if use_years else None)
         with st.spinner("Retrieving and synthesizing…"):
-            text, hits = answer(question.strip(), **kw)
+            text, hits = answer(question.strip())
         st.markdown(text)
         with st.expander(f"🔍 Retrieved context ({len(hits)} chunks)"):
             _sources_panel(hits)
